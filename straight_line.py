@@ -675,7 +675,7 @@ class Simulation:
 
             # After simulation ends, process and plot results if not in silent mode
             if not self.collision_occurred and not self.config.SILENT:
-                self.data_manager.load_real_data("real_data.xlsx")
+                self.data_manager.load_real_data("data/real_data.xlsx")
                 self.plotter.plot_histograms(
                     data_manager=self.data_manager,
                     gig_spawn=self.gig_spawn,
