@@ -21,7 +21,7 @@ def apply_zoom(x, y, zoom_factor, center_x, center_y):
 # --- Config Class ---
 class Config:
     # Visualization settings
-    VISUALIZE = True  # Set to True to visualize the simulation
+    VISUALIZE = False  # Set to True to visualize the simulation
 
     # Window dimensions
     WIDTH, HEIGHT = 900, 600  # 900x600 pixels (800 for simulation, 100 for slider)
@@ -108,7 +108,7 @@ class Config:
     }
 
     # Maximum total spawned cars on main road
-    MAX_TOTAL_SPAWNED_CARS_MAIN = 1000  # Nastavte podle potřeby
+    MAX_TOTAL_SPAWNED_CARS_MAIN = 20000  # Nastavte podle potřeby
 
 # --- IDM Class ---
 class IDM:
@@ -281,13 +281,10 @@ class Road:
     def spawn_car(self):
         # Kontrola maximálního počtu aut na hlavní silnici
         if self.road_type == 'main':
-            if self.total_spawned_cars >= self.max_total_spawned_cars_main:
+            if self.max_total_spawned_cars_main is not None and self.total_spawned_cars >= self.max_total_spawned_cars_main:
                 simulation.save_data_to_csv()  # Zavolání uložení dat
-                pygame.quit()  # Zavření Pygame okna
-                sys.exit()
-            if self.max_total_spawned_cars_main is not None and len(self.cars) >= self.max_total_spawned_cars_main:
-                simulation.save_data_to_csv()  # Zavolání uložení dat
-                pygame.quit()  # Zavření Pygame okna
+                if self.config.VISUALIZE:
+                    pygame.quit()  # Zavření Pygame okna
                 sys.exit()
 
         speed_sample = lognorm.rvs(s=self.lognorm_sigma_log, scale=np.exp(self.lognorm_mu_log))
@@ -303,7 +300,7 @@ class Road:
         self.time_since_last_spawn = 0.0  # Resetování času od posledního spawnu
 
         # Inkrementace počítadla spawnovaných aut
-        if self.road_type == 'main':
+        if self.road_type == 'main' and new_car.color == self.config.COLORS['BLUE']:
             self.total_spawned_cars += 1
 
         # Nyní budeme generovat čas do dalšího spawnu
@@ -521,13 +518,19 @@ class Road:
 class Simulation:
     def __init__(self):
         self.config = Config()
-        pygame.init()
-        pygame.font.init()
+        if self.config.VISUALIZE:
+            pygame.init()
+            pygame.font.init()
 
-        self.window = pygame.display.set_mode((self.config.WIDTH, self.config.HEIGHT))
-        pygame.display.set_caption("T-Intersection Simulation with Zoom and Speed Control")
-        self.font = pygame.font.SysFont(None, 20)
-        self.clock = pygame.time.Clock()
+            self.window = pygame.display.set_mode((self.config.WIDTH, self.config.HEIGHT))
+            pygame.display.set_caption("T-Intersection Simulation with Zoom and Speed Control")
+            self.font = pygame.font.SysFont(None, 20)
+            self.clock = pygame.time.Clock()
+        else:
+            # Pokud nemáme vizualizaci, neinitializujeme Pygame
+            self.window = None
+            self.font = None
+            self.clock = None
 
         # Create roads
         self.main_road = Road(self.config, 'main')
@@ -587,86 +590,125 @@ class Simulation:
         self.secondary_road.spawn_car()
 
         while running:
-            # Cap the frame rate and get delta time
-            dt = self.clock.tick(60) / 1000.0  # Seconds per frame
-            adjusted_dt = dt * self.speed_multiplier  # Adjusted delta time based on speed multiplier
-            self.simulation_time += adjusted_dt  # Aktualizace simulačního času správně
+            if self.config.VISUALIZE:
+                # Cap the frame rate and get delta time
+                dt = self.clock.tick(60) / 1000.0  # Seconds per frame
+                adjusted_dt = dt * self.speed_multiplier  # Adjusted delta time based on speed multiplier
+                self.simulation_time += adjusted_dt  # Aktualizace simulačního času správně
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
 
-                # Handle mouse button down events for the slider handle and speed-up button
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:  # Left mouse button
-                        mouse_pos = event.pos
-                        if self.slider_handle_rect.collidepoint(mouse_pos):
-                            self.slider_dragging = True
-                        elif self.button_rect.collidepoint(mouse_pos):
-                            self.update_speed_multiplier()
+                    # Handle mouse button down events for the slider handle and speed-up button
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        if event.button == 1:  # Left mouse button
+                            mouse_pos = event.pos
+                            if self.slider_handle_rect.collidepoint(mouse_pos):
+                                self.slider_dragging = True
+                            elif self.button_rect.collidepoint(mouse_pos):
+                                self.update_speed_multiplier()
 
-                elif event.type == pygame.MOUSEBUTTONUP:
-                    if event.button == 1:  # Left mouse button
-                        self.slider_dragging = False
+                    elif event.type == pygame.MOUSEBUTTONUP:
+                        if event.button == 1:  # Left mouse button
+                            self.slider_dragging = False
 
-                # Handle mouse motion for dragging the slider handle
-                elif event.type == pygame.MOUSEMOTION:
-                    if self.slider_dragging:
-                        mouse_x, mouse_y = event.pos
-                        # Clamp the handle within the slider_rect
-                        new_y = max(self.slider_rect.y, min(mouse_y, self.slider_rect.y + self.slider_rect.height))
-                        self.slider_handle_rect.y = new_y - self.slider_handle_rect.height // 2
+                    # Handle mouse motion for dragging the slider handle
+                    elif event.type == pygame.MOUSEMOTION:
+                        if self.slider_dragging:
+                            mouse_x, mouse_y = event.pos
+                            # Clamp the handle within the slider_rect
+                            new_y = max(self.slider_rect.y, min(mouse_y, self.slider_rect.y + self.slider_rect.height))
+                            self.slider_handle_rect.y = new_y - self.slider_handle_rect.height // 2
 
-                        # Map the handle position to zoom_factor
-                        # Invert the y-axis: higher y -> lower zoom
-                        relative_y = new_y - self.slider_rect.y
-                        ratio = 1 - (relative_y / self.slider_rect.height)
-                        self.zoom_factor = self.min_zoom + ratio * (self.max_zoom - self.min_zoom)
+                            # Map the handle position to zoom_factor
+                            # Invert the y-axis: higher y -> lower zoom
+                            relative_y = new_y - self.slider_rect.y
+                            ratio = 1 - (relative_y / self.slider_rect.height)
+                            self.zoom_factor = self.min_zoom + ratio * (self.max_zoom - self.min_zoom)
+                            self.zoom_factor = round(self.zoom_factor, 2)
+                            # Update other zoom-dependent elements if necessary
+
+                    # Handle mouse wheel for zooming
+                    elif event.type == pygame.MOUSEWHEEL:
+                        if event.y > 0:
+                            # Zoom in
+                            self.zoom_factor = min(self.zoom_factor * 1.1, self.max_zoom)
+                        elif event.y < 0:
+                            # Zoom out
+                            self.zoom_factor = max(self.zoom_factor / 1.1, self.min_zoom)
                         self.zoom_factor = round(self.zoom_factor, 2)
-                        # Update other zoom-dependent elements if necessary
+                        # Update slider handle position
+                        self.update_slider_handle()
 
-                # Handle mouse wheel for zooming
-                elif event.type == pygame.MOUSEWHEEL:
-                    if event.y > 0:
-                        # Zoom in
-                        self.zoom_factor = min(self.zoom_factor * 1.1, self.max_zoom)
-                    elif event.y < 0:
-                        # Zoom out
-                        self.zoom_factor = max(self.zoom_factor / 1.1, self.min_zoom)
+                if self.slider_dragging:
+                    # Continuously update slider handle and zoom_factor
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    new_y = max(self.slider_rect.y, min(mouse_y, self.slider_rect.y + self.slider_rect.height))
+                    self.slider_handle_rect.y = new_y - self.slider_handle_rect.height // 2
+
+                    relative_y = new_y - self.slider_rect.y
+                    ratio = 1 - (relative_y / self.slider_rect.height)
+                    self.zoom_factor = self.min_zoom + ratio * (self.max_zoom - self.min_zoom)
                     self.zoom_factor = round(self.zoom_factor, 2)
-                    # Update slider handle position
-                    self.update_slider_handle()
 
-            if self.slider_dragging:
-                # Continuously update slider handle and zoom_factor
-                mouse_x, mouse_y = pygame.mouse.get_pos()
-                new_y = max(self.slider_rect.y, min(mouse_y, self.slider_rect.y + self.slider_rect.height))
-                self.slider_handle_rect.y = new_y - self.slider_handle_rect.height // 2
+                if not self.collision_occurred:
+                    # Update logic with adjusted delta time
+                    was_last_spawn = self.main_road.update_cars(adjusted_dt, self.simulation_time, self)
+                    self.secondary_road.update_cars(adjusted_dt, self.simulation_time, self, main_road=self.main_road)
 
-                relative_y = new_y - self.slider_rect.y
-                ratio = 1 - (relative_y / self.slider_rect.height)
-                self.zoom_factor = self.min_zoom + ratio * (self.max_zoom - self.min_zoom)
-                self.zoom_factor = round(self.zoom_factor, 2)
+                    # Collision check
+                    self.check_collisions()
 
-            if not self.collision_occurred:
-                # Update logic with adjusted delta time
-                was_last_spawn = self.main_road.update_cars(adjusted_dt, self.simulation_time, self)
-                self.secondary_road.update_cars(adjusted_dt, self.simulation_time, self, main_road=self.main_road)
+                    # Ukončení simulace, pokud bylo spawnováno poslední modré auto
+                    if not self.last_main_car_spawned and was_last_spawn:
+                        self.last_main_car_spawned = True
+                        print("Last blue car spawned. Ending simulation.")
+                        running = False
 
-                # Collision check
-                self.check_collisions()
+                # Draw everything
+                self.draw()
 
-                # Ukončení simulace, pokud bylo spawnováno poslední modré auto
-                if not self.last_main_car_spawned and was_last_spawn:
-                    self.last_main_car_spawned = True
-                    print("Last blue car spawned. Ending simulation.")
-                    running = False
+            else:
+                # Režim bez vizualizace
+                # Použijeme malou iteraci pro zpracování událostí, ale bez vykreslování
+                # Aby simulace běžela co nejrychleji
+                try:
+                    while True:
+                        event = pygame.event.poll()
+                        if event.type == pygame.QUIT:
+                            running = False
+                            break
+                        elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                            running = False
+                            break
+                        # Můžete přidat další zpracování událostí, pokud je potřeba
+                        else:
+                            break
+                except:
+                    pass  # Pokud není Pygame inicializován, ignorujte
 
-            # Draw everything
-            self.draw()
+                if not self.collision_occurred:
+                    # Neomezený časový krok pro maximální rychlost
+                    adjusted_dt = 0.01 * self.speed_multiplier  # Nastavte menší krok pro přesnost
+                    self.simulation_time += adjusted_dt
+
+                    # Aktualizujte auta
+                    was_last_spawn = self.main_road.update_cars(adjusted_dt, self.simulation_time, self)
+                    self.secondary_road.update_cars(adjusted_dt, self.simulation_time, self, main_road=self.main_road)
+
+                    # Collision check
+                    self.check_collisions()
+
+                    # Ukončení simulace, pokud bylo spawnováno poslední modré auto
+                    if not self.last_main_car_spawned and was_last_spawn:
+                        self.last_main_car_spawned = True
+                        print("Last blue car spawned. Ending simulation.")
+                        running = False
 
         # Po ukončení simulace ukončíme Pygame a uložíme data do CSV
-        pygame.quit()
+        if self.config.VISUALIZE:
+            pygame.quit()
         self.save_data_to_csv()
         sys.exit()
 
@@ -736,6 +778,9 @@ class Simulation:
                     break
 
     def draw(self):
+        if not self.config.VISUALIZE:
+            return  # Pokud nemáme vizualizaci, neprovádíme kreslení
+
         self.window.fill(self.config.COLORS['WHITE'])
         # Draw roads
         self.main_road.draw(self.window, self.font, self.zoom_factor)
