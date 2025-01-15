@@ -841,7 +841,7 @@ class Simulation:
         """
         Saves all recorded time gaps and secondary merges to a CSV file.
         """
-        filename = "simulation_data.csv"
+        filename = "data/simulation_data.csv"
         with open(filename, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(["Time Gap (s)", "Secondary Merges"])
