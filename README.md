@@ -59,6 +59,23 @@ Tento kód simuluje provoz na silnici pomocí modelu **IDM (Intelligent Driver M
   - Tento exponent ovlivňuje, jak rychle se mění akcelerace vozidla v závislosti na vzdálenosti a relativní rychlosti. V modelu IDM bývá hodnota kolem 4. Vyšší hodnota znamená, že model je citlivější na změny ve vzdálenosti a rychlosti, což může vést k agresivnějším nebo naopak opatrnějším reakcím.
 
 
-Výše popsaný straight_line.py pak slouží k jednotlivým simulacím, které jsou volány v kódu **config_parameters.py**. Tento kód pomocí Grid search algoritmu hledá optimální parametry IDM (**min_gap**,**max_acc**,**max_dec**,**react_time**,**desired_speed**,**delta**) s cílem minimalizovat metriku chi-kvadrát (mezi dvěma histogramy) - metrika podobnosti dvou rozdělení. Cílem je aby při daném počátečním rozdělení rychlostí, intervalů spawnu aut a optimalizovanými parametry IDM bylo rozdělení intervalů průjezdů aut na konci silnice (po 300 metrech) stejné, jako bylo naměřeno na mnichovské křižovatce. Tímto způsobem jsem vygeneroval závislost chi-kvadrát metriky na různých (do mřížky uspořádaných) volbách parametrů IDM. 
+Výše popsaný straight_line.py pak slouží k jednotlivým simulacím, které jsou volány v kódu **config_parameters.py**. Tento kód pomocí Grid search algoritmu hledá optimální parametry IDM (**min_gap**,**max_acc**,**max_dec**,**react_time**,**desired_speed**,**delta**) s cílem minimalizovat metriku chi-kvadrát (mezi dvěma histogramy) - metrika podobnosti dvou rozdělení. Cílem je aby při daném počátečním rozdělení rychlostí, intervalů spawnu aut a optimalizovanými parametry IDM bylo rozdělení intervalů průjezdů aut na konci silnice (po 300 metrech) stejné, jako bylo naměřeno na mnichovské křižovatce. Tímto způsobem jsem vygeneroval závislost chi-kvadrát metriky na různých (do mřížky uspořádaných) volbách parametrů IDM. Simulace pro danou volbu parametrů proběhla pětkrát a uložil se průměr ze všech pěti chi-kvardát hodnot. Simulace běžela paralelně na 16 výpočetních uzlech Intel XEON Gold 6134@3.2GHz CPU na FJFI HELIOS clusteru. Zkoušel jsem s využitím metod regresní analýzy určit vyhodný polynom, který by aproximoval logaritmicky tranformovanou chi-kvadrát metriku závislou na mocninách regresorů (parametrů), tento polynom jsem pak minimalizoval. Bohužel z důvodu vysokého počtu regresorů (overfitingu) (= kolem 5000) byl interval predikce příliš široký a nalezené parametry IDM, které by minimalizovali tuto metriku v praxi, měly hodnotu metriky vyšší, než je minimální naměřená hodnota z Grid search. Zkoušel jsem také udělat Stepwise selection regresorů, ale trvalo to příliš dlouho. Řekl jsem si, že tudy cesta nevede a jako optimální parametry IDM jsem zvolil ty, které měly ve výsledku Grid search algoritmu nejnižší hodnotu průměrné chi-kvadrát metriky. Tyto optimální parametry IDM jsou: 
+
+- min_gap = 1.625
+- max_acc = 2
+- max_dec = 4
+- react_time = 0.3
+- desired_speed = 19.44
+- delta = 2
+
+hodnota průměrné chi-kvadrát byla pro tuto volbu rovna 0.0139.
+
+**Celkem tedy:** Když zvolíme parametry IDM tímto způsobem, tak při takto zvoleném rozdělení počátečních rychlostí a intervalů spawnů aut, po 300 metrech mají časové intervaly průjezdů aut křižovatkou rozdělení velmi podobné tomu, které bylo naměřeno na mnichovské křižovatce.
+
+## T_cross_new.py
+
+
+
+
 
 
