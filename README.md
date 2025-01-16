@@ -34,6 +34,9 @@ Tento kód simuluje provoz na silnici pomocí modelu **IDM (Intelligent Driver M
      - Vykreslení grafů a histogramů pro časy mezi spawny vozidel, průjezdy měřícím bodem a počáteční rychlosti.
      - Porovnání s reálnými daty (dají se načíst z Excel souboru).
      - **Kolmogorov-Smirnov** testy pro kontrolu shody empirických dat s GIG/log-normální hypotézou. V případě KS testu reálných dat s GIG hypotézou dojde k jeho zamítnutí ačkoliv na základě vizuálního porovnání fitované GIG rozdělení velmi dobře aproximuje histogram. To si vysvětluji velkým množstvím dat (cca 23000 vzorků).
+    
+
+Vpravo nahoře vidíme histogram intervalů průjezdů aut křižovatkou (když se auta řídí IDM model s parametry nalezenými pomocí metody popsané v dalším odstavci). Je vidět, že nafitované parametry GIG na výsledky simulace jsou blízko parametrům GIG rozdělení nafitovaného na reálná data.
 
 ![výsledky simaluce na rovné silnici](plots/straight_line.png)
 
@@ -109,7 +112,17 @@ Tento proces probíhá na základě bezpečné mezery mezi vozidly na hlavní si
 
 ## Porovnání reálných dat z T křižovatky a simulace
 
-Naměřená data časových intervalů mezi průjezdy aut na hlavní a počet aut, které se do mezery zařadilo z vedlejší jsou pak analyzována a porovnána s reálnými daty v kódu merging_data_analysis.py. Data z obou souborů jsou rozdělena do kategorií podle počtu zařazených aut. Dvě sobě příslušející kategorie z obou souborů jsou porovnány. Testuje se podobnost rozdělení dvou výběrů (časových intervalů průjezdů aut na hlavní silnici) v rámci dané kategorie pomocí Kolmogorov-Smirnov GoF testu. Tímto způsobem se vyhodnotí všechny kategorie. Ve všech kategoriích byla nulová hypotéza zamítnuta. Pomocí KS GoF testu byly vyhodnoceny také celé výběry intervalů průjezdů z reálných dat a simulace, tento test byl ale také zamítnut, přestože na základě vizuálního porovnání jsou si histogramy poměrně blízké.
+Naměřená data časových intervalů mezi průjezdy aut na hlavní a počet aut, které se do mezery zařadilo z vedlejší jsou pak analyzována a porovnána s reálnými daty v kódu merging_data_analysis.py. Data z obou souborů jsou rozdělena do kategorií podle počtu zařazených aut. Dvě sobě příslušející kategorie z obou souborů jsou porovnány. Testuje se podobnost rozdělení dvou výběrů (časových intervalů průjezdů aut na hlavní silnici) v rámci dané kategorie pomocí Kolmogorov-Smirnov GoF testu. Tímto způsobem se vyhodnotí všechny kategorie. Ve všech kategoriích byla nulová hypotéza zamítnuta. Pomocí KS GoF testu byly vyhodnoceny také celé výběry intervalů průjezdů z reálných dat a simulace, tento test byl ale také zamítnut, přestože na základě vizuálního porovnání jsou si histogramy poměrně blízké. Následuje histogram intervalů průjezdů křižovatkou z reálných dat a z dat naměřených v simulaci. Pak histogramy průjezdů křižovatkou z reálných dat a z dat naměřených v simulaci když se do mezery zařadí 0 aut, jedno auto a dvě auta. Lze pozorovat že na simulovaná data mají užší histogram a s rostoucím počtem zařazených aut se histogram posouvá vlevo.
+
+![histogram all](plots/all.png)
+
+![histogram 0 aut](plots/0aut.png)
+
+![histogram 1 auto](plots/1auto.png)
+
+![histogram 2 auta](plots/2auta.png)
+
+Pokud bych měl simulaci vylepšit, tak se zaměřím na zlepšení logiky zařazování aut z vedlejší silnice.
 
 
 
