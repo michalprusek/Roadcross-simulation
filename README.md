@@ -72,7 +72,7 @@ Výše popsaný straight_line.py pak slouží k jednotlivým simulacím, které 
 - desired_speed = 19.44
 - delta = 2
 
-hodnota průměrné chi-kvadrát byla pro tuto volbu rovna 0.0139.
+hodnota průměrné chi-kvadrát byla pro tuto volbu rovna 0.0139. Výsledek Grid search, ze kterého jsem tyto hodnoty čerpal je uložen v **data/IDM_parameters.xlsx**.
 
 **Celkem tedy:** Když zvolíme parametry IDM tímto způsobem, tak při takto zvoleném rozdělení počátečních rychlostí a intervalů spawnů aut, po 300 metrech mají časové intervaly průjezdů aut křižovatkou rozdělení velmi podobné tomu, které bylo naměřeno na mnichovské křižovatce.
 
@@ -122,7 +122,7 @@ Naměřená data časových intervalů mezi průjezdy aut na hlavní a počet au
 
 ![histogram 2 auta](plots/2auta.png)
 
-Pokud bych měl simulaci vylepšit, tak se zaměřím na zlepšení logiky zařazování aut z vedlejší silnice.
+Pokud bych měl simulaci vylepšit, tak se zaměřím na zlepšení logiky zařazování aut z vedlejší silnice. Reálná data a data naměřená ze simulace jsou uloženy ve složce **data** pod názvy **real_data.xlsx** a **simulation_data.csv**.
 
 ## cluster
 
