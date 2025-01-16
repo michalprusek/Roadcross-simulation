@@ -1,6 +1,5 @@
 # Simulace křižovatky
 
-
 # Úvod
 
 Tato seminární práce se zaměřuje na simulaci dopravní křižovatky typu T pomocí Inteligentního řidičského modelu (IDM). Cílem simulace je nalézt vhodná počáteční rozdělení rychlostí a časových rozestupů mezi vozidly (při generování vozidel na začátku silnice) spolu s optimalizovanými parametry IDM, aby výsledné rozdělení časových intervalů průjezdů vozidel křižovatkou odpovídalo reálným datům získaným na mnichovské křižovatce. Reálná data z této křižovatky mám od profesora Krbálka. Tato data obsahují jak časové intervaly mezi průjezdy dvou po sobě jedoucích aut na hlavní silnici křižovatkou. Dále obsahují druhý sloupec, který říká, kolik aut z vedlejší silnice se do vzniklé mezery na hlavní silnici zařadilo. Dalším cílem je porovnat simulované počty zařazených vozidel do mezery mezi auty na hlavní silnici s reálnými počty zařazených aut.
@@ -74,6 +73,39 @@ hodnota průměrné chi-kvadrát byla pro tuto volbu rovna 0.0139.
 
 ## T_cross_new.py
 
+Tento kód už implementuje křižovatku typu T. Předpokládá, že na hlavní silnici jedou auta a do mezer mezi nimi se připojují auta z vedlejší silnice. Parametry IDM celé simulace odpovídají těm, které byly nalezeny jako optimální v předešlém kódu. Jediný rozdíl je v desired speed na vedlejší silnici, ta je nastavena na 50km/h = 13.88m/s (oproti 70km/h = 19.44m/s na hlavní silnici). Na obou silnicích jsou auta spawnování s rychlostí vygenerovanou z log-normálního rozdělení, ale s odlišnými parametry a také intervaly mezi spawny aut jsou generovány z GIG rozdělení, ale s odlišnými parametry. Ovšem parametry GIG rozdělení a log-normálního rozdělení odpovídají těm, které byly použity v simulaci straight_line.py dříve. Také křižovatka je umístěna na hlavní silni přesně 300 metrů od začátku hlavní silnice (stejně jako v straight_line.py). 
+
+
+### Zařazování aut z vedlejší silnice
+
+Tento proces probíhá na základě bezpečné mezery mezi vozidly na hlavní silnici.
+
+1. **Zpomalení při přibližování ke křižovatce**
+- Červená auta (z vedlejší silnice) se přibližují ke křižovatce a začínají postupně zpomalovat.
+- Zpomalení začíná 50 metrů před křižovatkou, kde se cílová rychlost snižuje z 50 km/h na 10 km/h. Během této doby už kontroluje, zda je na hlavní volná mezera.
+- Pokud auto nemá volno k zařazení, pokračuje v postupném zpomalování.
+
+2. **Kontrola mezery na hlavní silnici**
+- Když červené auto dosáhne křižovatky, ověřuje se, zda je dostatečná mezera pro bezpečné zařazení.
+- Kontrola probíhá podle:
+  - **Vzdálenosti auta před křižovatkou k nejbližšímu autu na hlavní silnici** (gap ahead).
+  - **Vzdálenosti auta za křižovatkou k nejbližšímu autu na hlavní silnici** (gap behind - bere v potaz i rozdíl rychlostí lag_car a čekajícího auta na vedlejší silnici).
+
+3. **Zařazení na hlavní silnici**
+- Pokud je mezera dostatečná, auto:
+  - Změní barvu na modrou (je zařazeno na hlavní silnici).
+  - Dostane parametry hlavní silnice (vyšší rychlost, jiný model chování).
+  - Pokračuje v jízdě na hlavní silnici.
+- Pokud není mezera dostatečná:
+  - Auto čeká na volno a zůstává u křižovatky na nízké rychlosti.
+
+4. **Sledování dat o zařazení**
+- Po každém úspěšném zařazení se zaznamená:
+  - Počet aut, která se zařadila na hlavní silnici z vedlejší silnice.
+  - Časový odstup mezi dvěma průjezdy modrých aut křižovatkou.
+- Tato data se ukládají do CSV souboru a lze je použít pro porovnání s reálnými daty.
+
+## Porovnání reálných dat z T křižovatky a simulace
 
 
 
