@@ -75,7 +75,7 @@ def compare_distributions(df_real, df_sim, common_counts):
             print("  Nedostatek dat pro porovnání. Přeskakuji.\n")
             continue
 
-        # Provedení KS testu
+        # Provedení KS testu pro tuto kategorii
         ks_stat, p_value = perform_ks_test(real_intervals, sim_intervals)
         print(f"  KS Test: Statistic = {ks_stat:.4f}, p-value = {p_value:.4f}")
 
@@ -115,6 +115,29 @@ def plot_distributions(real, sim, count):
     plt.show()
 
 
+def ks_test_all_intervals(df_real, df_sim):
+    """
+    Provede KS test mezi celkovými rozděleními intervalů (první sloupec) v obou datových sadách.
+    """
+    real_intervals = df_real['Interval'].values
+    sim_intervals = df_sim['Interval'].values
+
+    print("=== KS TEST PRO CELKOVÁ DATA ===")
+    print(f"  Celkový počet reálných hodnot: {len(real_intervals)}")
+    print(f"  Celkový počet simulovaných hodnot: {len(sim_intervals)}")
+
+    if len(real_intervals) == 0 or len(sim_intervals) == 0:
+        print("  Nedostatek dat pro globální KS test.\n")
+        return None
+
+    ks_stat, p_value = perform_ks_test(real_intervals, sim_intervals)
+    print(f"  KS Test - Celková data: Statistic = {ks_stat:.4f}, p-value = {p_value:.4f}\n")
+
+    plot_distributions(real_intervals,sim_intervals,"all")
+
+    return {'KS_Statistic': ks_stat, 'p_value': p_value}
+
+
 def main():
     # Cesty k souborům
     real_file = 'real_data.xlsx'
@@ -122,6 +145,9 @@ def main():
 
     # Načtení dat
     df_real, df_sim = load_data(real_file, simulated_file)
+
+    # Provede KS test mezi celkovými intervaly reálných a simulovaných dat
+    ks_test_result = ks_test_all_intervals(df_real, df_sim)
 
     # Rozdělení do skupin a identifikace společných kategorií
     real_groups, sim_groups, common_counts = group_by_count(df_real, df_sim)
@@ -136,6 +162,10 @@ def main():
     # Uložení výsledků do CSV (volitelné)
     comparison_results.to_csv('comparison_results.csv', index=False)
     print("Výsledky porovnání byly uloženy do 'comparison_results.csv'.")
+
+    if ks_test_result:
+        with open('comparison_results.csv', 'a') as f:
+            f.write(f"\nKS Test - Celková data: Statistic = {ks_test_result['KS_Statistic']:.4f}, p-value = {ks_test_result['p_value']:.4f}")
 
 
 if __name__ == "__main__":
