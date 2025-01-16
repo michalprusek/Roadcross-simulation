@@ -8,13 +8,6 @@ def objective(params, desired_stats):
     """
     Objektivní funkce pro optimalizaci parametrů GIG distribuce tak,
     aby byla minimalizována absolutní odchylka od požadovaných hodnot.
-
-    Parameters:
-    - params (list or array): Parametry [lambda_, beta] pro GIG distribuci.
-    - desired_stats (list or array): Požadované [mean, variance].
-
-    Returns:
-    - float: Součet absolutních rozdílů mezi aktuálními a požadovanými statistiky.
     """
     lambda_, beta = params
     # Zajistit, aby parametry byly pozitivní
@@ -41,18 +34,10 @@ def objective(params, desired_stats):
 def optimize_GIG(desired_mean, desired_var, initial_guess):
     """
     Optimalizuje parametry GIG distribuce pro dosažení požadovaných statistických hodnot.
-
-    Parameters:
-    - desired_mean (float): Požadovaná střední hodnota.
-    - desired_var (float): Požadovaný rozptyl.
-    - initial_guess (list): Počáteční odhad parametrů [lambda_, beta].
-
-    Returns:
-    - dict: Optimalizované parametry a dosažené statistiky.
     """
     desired_stats = [desired_mean, desired_var]
 
-    # Proveďte optimalizaci pomocí metody Nelder-Mead
+    # Provede optimalizaci pomocí metody Nelder-Mead
     result = minimize(
         objective,
         initial_guess,
@@ -83,11 +68,6 @@ def optimize_GIG(desired_mean, desired_var, initial_guess):
 def plot_distribution(gig_dist, desired_mean, desired_var):
     """
     Vizualizuje PDF optimalizované GIG distribuce.
-
-    Parameters:
-    - gig_dist (scipy.stats.rv_continuous_frozen): Optimalizovaná GIG distribuce.
-    - desired_mean (float): Požadovaná střední hodnota.
-    - desired_var (float): Požadovaný rozptyl.
     """
     x = np.linspace(0.1, desired_mean * 3, 1000)
     pdf = gig_dist.pdf(x)
@@ -110,17 +90,17 @@ def main():
     # Počáteční odhad parametrů [lambda_, beta]
     initial_guess = [4.0, 300.0]
 
-    # Optimalizujte parametry GIG distribuce
+    # Optimalizuje parametry GIG distribuce
     optimal_params = optimize_GIG(desired_mean, desired_var, initial_guess)
 
-    # Vytiskněte optimalizované parametry a dosažené statistiky
+    # Vytiskne optimalizované parametry a dosažené statistiky
     print("\n--- Optimalizované Parametry GIG Distribuce ---")
     print(f"Lambda (λ): {optimal_params['lambda_']:.4f}")
     print(f"Beta (β): {optimal_params['beta']:.4f}")
     print(f"Computed Mean: {optimal_params['computed_mean']:.4f} meters")
     print(f"Computed Variance: {optimal_params['computed_var']:.4f} meters^2")
 
-    # Vizualizujte optimalizovanou distribuci
+    # Vizualizuje optimalizovanou distribuci
     plot_distribution(optimal_params['optimized_gig'], desired_mean, desired_var)
 
 
