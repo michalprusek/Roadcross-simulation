@@ -124,6 +124,14 @@ Naměřená data časových intervalů mezi průjezdy aut na hlavní a počet au
 
 Pokud bych měl simulaci vylepšit, tak se zaměřím na zlepšení logiky zařazování aut z vedlejší silnice.
 
+## cluster
+
+Složka obsahuje soubory, které sloužily k simulaci na školním FJFI HELIOS clusteru.
+
+## ChatGPT
+
+Kódy byly vytvářeny také s pomocí jazykových modelů ChaGPT 4o, ChatGPT o1-mini a ChatGPT o1.
+
 
 
 
