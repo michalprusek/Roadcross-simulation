@@ -33,7 +33,9 @@ Tento kód simuluje provoz na silnici pomocí modelu **IDM (Intelligent Driver M
    - Po skončení simulace (pokud není silent režim) proběhne:
      - Vykreslení grafů a histogramů pro časy mezi spawny vozidel, průjezdy měřícím bodem a počáteční rychlosti.
      - Porovnání s reálnými daty (dají se načíst z Excel souboru).
-     - **Kolmogorov-Smirnov** testy pro kontrolu shody empirických dat s GIG/log-normální hypotézou. V případě KS testu reálných dat s GIG hypotézou dojde k jeho zamítnutí ačkoliv na základě       vizuálního porovnání fitované GIG rozdělení velmi dobře aproximuje histogram. To si vysvětluji velkým množstvím dat (cca 23000 vzorků).
+     - **Kolmogorov-Smirnov** testy pro kontrolu shody empirických dat s GIG/log-normální hypotézou. V případě KS testu reálných dat s GIG hypotézou dojde k jeho zamítnutí ačkoliv na základě vizuálního porovnání fitované GIG rozdělení velmi dobře aproximuje histogram. To si vysvětluji velkým množstvím dat (cca 23000 vzorků).
+
+![výsledky simaluce na rovné silnici](plots/straight_line.png)
 
 ## Proces hledání optimálních parametrů IDM
 
