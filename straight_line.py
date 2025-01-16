@@ -2,30 +2,30 @@ import pygame
 import numpy as np
 from scipy.stats import lognorm, kstest, geninvgauss
 import matplotlib.pyplot as plt
-import pandas as pd  # For loading Excel files
-import sys  # For exiting the program
+import pandas as pd  # Pro načítání Excel souborů
+import sys  # Pro ukončení programu
 from collections import deque
 
-# --- PARAMETERS FOR SIMULATION ---
+# --- PARAMETRY PRO SIMULACI ---
 class Config:
     VIZUALIZE = True
 
-    # Simulation Parameters
+    # Parametry simulace
     MAX_CARS = 1000  # Nastaveno na 5000 pro plné testování
 
-    # GIG Distribution Parameters for Spawn Time Intervals
+    # Parametry GIG rozdělení pro intervaly spawn času
     GIG_TIME_PARAMETERS = {
-        'lambda_': 2.71,    # Shape parameter (lambda_) - Optimized
-        'beta': 1.03       # Scale parameter (beta) - Optimized
+        'lambda_': 2.71,    # Tvarový parametr (lambda_) - Optimalizováno
+        'beta': 1.03       # Měřítkový parametr (beta) - Optimalizováno
     }
 
-    # LOGNORM Distribution Parameters for spawn speeds - mean=50km/h, std=1,5m/s
+    # Parametry LOGNORM rozdělení pro rychlosti spawn - průměr=50km/h, std=1,5m/s
     LOGNORM_PARAMETERS = {
-        "mu_log": np.log(13.89) - (0.107**2) / 2,  # Approximately 2.62425
+        "mu_log": np.log(13.89) - (0.107**2) / 2,  # Přibližně 2.62425
         "sigma_log": 0.107
     }
 
-    # IDM parameters
+    # IDM parametry
     '''
     'min_gap': 1.625,
     'acceleration': 2.0,
@@ -34,22 +34,22 @@ class Config:
     'desired_speed': 19.44,  # ~50 km/h
     'delta': 2,
     '''
-    MIN_GAP = 1.625  # Minimum gap between cars
-    MAX_ACCELERATION = 2.0  # Maximum acceleration in m/s²
-    MAX_DECELERATION = 4.0  # Maximum deceleration in m/s²
-    REACT_TIME = 0.3  # Driver's react time (time headway)
+    MIN_GAP = 1.625  # Minimální mezera mezi auty
+    MAX_ACCELERATION = 2.0  # Maximální zrychlení v m/s²
+    MAX_DECELERATION = 4.0  # Komfortní brzdění v m/s²
+    REACT_TIME = 0.3  # Reakční doba řidiče (časový předstih)
     DESIRED_SPEED = 19.44
     DELTA = 2
 
-    # Road Settings
-    ROAD_LENGTH = 300  # Road length in meters
-    SCALE = 5          # Conversion factor (5 pixels = 1 meter)
+    # Nastavení silnice
+    ROAD_LENGTH = 300  # Délka silnice v metrech
+    SCALE = 5          # Konverzní faktor (5 pixelů = 1 metr)
 
-    # Roadcross Position
-    ROADCROSS_X_PX = ROAD_LENGTH * SCALE  # Roadcross position in pixels
-    ROADCROSS_POSITION = ROAD_LENGTH  # Position in meters
+    # Pozice silniční křižovatky
+    ROADCROSS_X_PX = ROAD_LENGTH * SCALE  # Pozice křižovatky v pixelech
+    ROADCROSS_POSITION = ROAD_LENGTH  # Pozice křižovatky v metrech
 
-    # Colors
+    # Barvy
     COLORS = {
         'WHITE': (255, 255, 255),
         'BLACK': (0, 0, 0),
@@ -58,48 +58,48 @@ class Config:
         'GRAY': (200, 200, 200)
     }
 
-    # Screen Dimensions
+    # Rozměry obrazovky
     WIDTH = 800
     HEIGHT = 600
 
-# --- Intelligent Driver Model (IDM) ---
+# --- Inteligentní model řidiče (IDM) ---
 class IDM:
     def __init__(self, config):
-        self.v0 = config.DESIRED_SPEED  # Desired speed (m/s)
-        self.a = config.MAX_ACCELERATION  # Maximum acceleration (m/s²)
-        self.b = config.MAX_DECELERATION  # Comfortable deceleration (m/s²)
+        self.v0 = config.DESIRED_SPEED  # Žádoucí rychlost (m/s)
+        self.a = config.MAX_ACCELERATION  # Maximální zrychlení (m/s²)
+        self.b = config.MAX_DECELERATION  # Komfortní brzdění (m/s²)
         self.delta = config.DELTA  # Exponent
-        self.s0 = config.MIN_GAP  # Minimum gap (m)
+        self.s0 = config.MIN_GAP  # Minimální mezera (m)
         self.t0 = config.REACT_TIME
 
     def compute_acceleration(self, v, delta_v, s):
         if s <= 0:
-            s = 0.1  # Prevent division by zero
+            s = 0.1  # Zabraň dělení nulou
         s_star = self.s0 + max(0, v * self.t0 + (v * delta_v) / (2 * np.sqrt(self.a * self.b)))
         acceleration = self.a * (1 - (v / self.v0) ** self.delta - (s_star / s) ** 2)
-        # Limit deceleration
+        # Omez brzdění
         acceleration = max(acceleration, -self.b)
         return acceleration
 
-# --- Car Class ---
+# --- Třída Auto ---
 class Car:
     WIDTH = 20
     HEIGHT = 10
 
     def __init__(self, position, road, config, initial_speed):
-        self.position = position  # Position on the road (m)
-        self.road = road          # Reference to the Road object
-        self.length = 5.0         # Car length in meters for spacing calculations
-        self.v = initial_speed    # Speed (m/s)
-        self.a = 0.0              # Acceleration (m/s²)
+        self.position = position  # Pozice na silnici (m)
+        self.road = road          # Reference na objekt Road
+        self.length = 5.0         # Délka auta pro výpočty mezery v metrech
+        self.v = initial_speed    # Rychlost (m/s)
+        self.a = 0.0              # Zrychlení (m/s²)
         self.idm = IDM(config)
         self.color = config.COLORS['BLUE']
-        self.has_recorded_interval = False  # Flag to check if interval has been recorded
+        self.has_recorded_interval = False  # Značka, zda byl interval zaznamenán
 
-        # Additional attributes
-        self.should_remove = False          # Indicates if the car should be removed
-        self.has_left_screen = False        # Indicates if the car has left the screen
-        self.roadcross_recorded = False     # Indicates if roadcross interval has been recorded
+        # Další atributy
+        self.should_remove = False          # Indikuje, zda by auto mělo být odstraněno
+        self.has_left_screen = False        # Indikuje, zda auto opustilo obrazovku
+        self.roadcross_recorded = False     # Indikuje, zda byl interval křižovatky zaznamenán
 
     def update(self, dt, lead_car=None):
         if lead_car:
@@ -109,14 +109,14 @@ class Car:
         else:
             self.a = self.idm.a * (1 - (self.v / self.idm.v0) ** self.idm.delta)
 
-        # Limit deceleration
+        # Omez brzdění
         self.a = max(self.a, -self.idm.b)
-        # Update speed and position
+        # Aktualizuj rychlost a pozici
         self.v += self.a * dt
-        self.v = max(self.v, 0)  # Apply speed limiter
+        self.v = max(self.v, 0)  # Aplikuj limit rychlosti
         self.position += self.v * dt + 0.5 * self.a * dt ** 2
 
-        # Check if the car has left the screen
+        # Zkontroluj, zda auto opustilo obrazovku
         if self.position > self.road.config.ROADCROSS_POSITION + self.road.config.ROAD_LENGTH:
             self.has_left_screen = True
 
@@ -126,8 +126,8 @@ class Car:
         rect = pygame.Rect(x - self.WIDTH // 2, y - self.HEIGHT // 2, self.WIDTH, self.HEIGHT)
         pygame.draw.rect(window, self.color, rect)
 
-        # Display car speed
-        speed_kmh = self.v * 3.6  # Convert to km/h
+        # Zobraz rychlost auta
+        speed_kmh = self.v * 3.6  # Převod na km/h
         speed_text = font.render(f"{speed_kmh:.1f} km/h", True, self.road.config.COLORS['BLACK'])
         text_rect = speed_text.get_rect(center=(rect.centerx, rect.centery - 15))
         window.blit(speed_text, text_rect)
@@ -137,199 +137,199 @@ class Car:
         y = self.road.config.HEIGHT // 2
         return x, y
 
-# --- GIG Distribution Class ---
+# --- Třída GIG Rozdělení ---
 class GIGDistribution:
     def __init__(self, lambda_, beta):
         """
-        Initialize the GIGDistribution with parameters lambda_ and beta.
+        Inicializuje GIGDistribution s parametry lambda_ a beta.
 
-        Parameters:
-        - lambda_ (float): Shape parameter (λ)
-        - beta (float): Scale parameter (β)
+        Parametry:
+        - lambda_ (float): Tvarový parametr (λ)
+        - beta (float): Měřítkový parametr (β)
         """
         self.lambda_ = lambda_
         self.beta = beta
         self.geninvgauss_dist = geninvgauss(self.lambda_, self.beta)
-        self.fitted_params = None  # Placeholder for fitted parameters
+        self.fitted_params = None  # Místo pro nahrání odhadnutých parametrů
 
     def pdf(self, x):
         """
-        Probability Density Function for the GIG distribution using SciPy's geninvgauss.
+        Hustotní funkce pravděpodobnosti pro GIG rozdělení pomocí SciPy's geninvgauss.
         """
         return self.geninvgauss_dist.pdf(x)
 
     def sample(self, num_samples=1):
         """
-        Sample values from the GIG(lambda_, beta) distribution using SciPy's geninvgauss.
+        Generuje vzorky z GIG(lambda_, beta) rozdělení pomocí SciPy's geninvgauss.
 
-        Parameters:
-        - num_samples (int): Number of samples to generate
+        Parametry:
+        - num_samples (int): Počet vzorků k vygenerování
 
-        Returns:
-        - samples (list): List of sampled values
+        Návratové hodnoty:
+        - samples (list): Seznam vygenerovaných vzorků
         """
         try:
             samples = self.geninvgauss_dist.rvs(size=num_samples)
-            # Ensure sampled values are positive and respect the minimum interval
-            samples = np.clip(samples, 0.5, None)  # Set minimum interval to 0.5 seconds
-            # Optional: Remove extremely large intervals if necessary
+            # Zajisti, aby vzorky byly kladné a respektovaly minimální interval
+            samples = np.clip(samples, 0.5, None)  # Nastav minimální interval na 0.5 sekundy
+            # Volitelné: Odstraň extrémně velké intervaly, pokud je to nutné
             # samples = np.clip(samples, 0.5, 20.0)
-            # print(samples)  # Remove or comment out to reduce console clutter
+            # print(samples)  # Odstraň nebo zakomentuj pro snížení hluku v konzoli
             if len(samples) < num_samples:
-                # If some samples are invalid, resample the missing ones
+                # Pokud některé vzorky jsou neplatné, generuj chybějící
                 additional_samples = self.sample(num_samples - len(samples))
                 samples = np.concatenate((samples, additional_samples))
             return samples.tolist()
         except ValueError as e:
             if hasattr(self, 'road') and not self.road.config.SILENT:
-                print(f"Error sampling next spawn time interval: {e}. Setting default interval of 10.0 seconds.")
-            return [10.0] * num_samples  # Default interval if sampling fails
+                print(f"Chyba při vzorkování dalšího intervalu spawn času: {e}. Nastavuji výchozí interval 10.0 sekund.")
+            return [10.0] * num_samples  # Výchozí interval v případě selhání vzorkování
 
     def fit(self, data):
         """
-        Fit the GIG distribution to the data using MLE with fixed scale=1.
+        Přizpůsobí GIG rozdělení datům pomocí MLE s pevnou škálou=1.
 
-        Parameters:
-        - data (array-like): Data points
+        Parametry:
+        - data (array-like): Data
 
-        Returns:
-        - fitted_params (tuple): Fitted parameters (lambda_, b, loc), or None if fitting failed
+        Návratové hodnoty:
+        - fitted_params (tuple): Přizpůsobené parametry (lambda_, b, loc), nebo None pokud přizpůsobení selže
         """
-        # Filter data to ensure all values are positive
+        # Filtruj data, aby všechny hodnoty byly kladné
         data = np.array(data)
         data = data[data > 0]
         if len(data) == 0:
             if hasattr(self, 'road') and not self.road.config.SILENT:
-                print("No positive data available for fitting.")
+                print("Žádná kladná data k dispozici pro přizpůsobení.")
             return None
 
         try:
-            # Fit using SciPy's geninvgauss with fixed scale=1 and loc unfixed
+            # Přizpůsobení pomocí SciPy's geninvgauss s pevnou škálou=1 a nefixovaným loc
             lambda_, b, loc, scale = geninvgauss.fit(data, floc=0, fscale=1)
 
-            # Store fitted parameters and return them
+            # Ulož přizpůsobené parametry a vrať je
             self.lambda_ = lambda_
-            self.beta = 1  # Scale is fixed at 1
+            self.beta = 1  # Škála je pevně nastavena na 1
             self.geninvgauss_dist = geninvgauss(lambda_, b, loc=0, scale=1)
             self.fitted_params = (lambda_, b, loc)
 
             return (lambda_, b, loc)
         except Exception as e:
             if hasattr(self, 'road') and not self.road.config.SILENT:
-                print(f"Error during fitting: {e}")
-            return None  # Explicitly return None in case of failure
+                print(f"Chyba během přizpůsobení: {e}")
+            return None  # Explicitně vrať None v případě selhání
 
     def plot_fit(self, data, fitted_params, theoretical_params=None, title='', xlabel='', ylabel='', ax=None, xlim=(0, 35)):
         """
-        Plot histogram of data and the fitted GIG PDF. Optionally, plot the theoretical GIG PDF.
+        Vykreslí histogram dat a přizpůsobenou GIG PDF. Volitelně vykreslí teoretickou GIG PDF.
 
-        Parameters:
-        - data (array-like): Data points
-        - fitted_params (tuple): Fitted parameters (lambda_, b, loc)
-        - theoretical_params (tuple): Optional tuple of theoretical parameters (lambda_, beta)
-        - title (str): Plot title
-        - xlabel (str): X-axis label
-        - ylabel (str): Y-axis label
-        - ax (matplotlib.axes.Axes): Matplotlib axis to plot on
-        - xlim (tuple): Limits for the x-axis
+        Parametry:
+        - data (array-like): Data
+        - fitted_params (tuple): Přizpůsobené parametry (lambda_, b, loc)
+        - theoretical_params (tuple): Volitelný n-tice teoretických parametrů (lambda_, beta)
+        - title (str): Titulek grafu
+        - xlabel (str): Popisek osy X
+        - ylabel (str): Popisek osy Y
+        - ax (matplotlib.axes.Axes): Matplotlib osa pro vykreslení
+        - xlim (tuple): Limity pro osu X
 
-        Returns:
+        Návratové hodnoty:
         - None
         """
         if ax is None:
             fig, ax = plt.subplots()
 
-        # Histogram of data
+        # Histogram dat
         ax.hist(data, bins=50, density=True, alpha=0.6, color='g', edgecolor='black', label='Data')
 
-        # Fitted GIG PDF
-        x = np.linspace(0, max(xlim), 1000)  # Start x from 0 up to xlim[1]
+        # Přizpůsobená GIG PDF
+        x = np.linspace(0, max(xlim), 1000)  # Začni x od 0 až po xlim[1]
         lambda_fit, b_fit, loc_fit = fitted_params
         pdf_fitted = geninvgauss.pdf(x, lambda_fit, b_fit, loc=loc_fit, scale=1)
-        ax.plot(x, pdf_fitted, 'r-', lw=2, label=f'Fitted GIG\nλ={lambda_fit:.2f}, b={b_fit:.2f}, loc={loc_fit:.2f}')
+        ax.plot(x, pdf_fitted, 'r-', lw=2, label=f'Přizpůsobená GIG\nλ={lambda_fit:.2f}, b={b_fit:.2f}, loc={loc_fit:.2f}')
 
-        # Theoretical GIG PDF (if provided)
+        # Teoretická GIG PDF (pokud je poskytnuta)
         if theoretical_params is not None:
             lambda_theo, beta_theo = theoretical_params
-            # Note: The theoretical b can be either fixed or use b_fit, depending on interpretation
-            # Here, we use b_fit with theoretical lambda_ and beta
+            # Poznámka: Teoretické b může být buď pevné nebo použít b_fit, v závislosti na interpretaci
+            # Zde používáme b_fit s teoretickým lambda_ a beta
             pdf_theoretical = geninvgauss.pdf(x, lambda_theo, beta_theo, loc=loc_fit, scale=1)
-            ax.plot(x, pdf_theoretical, 'b--', lw=2, label=f'Theoretical GIG\nλ={lambda_theo:.2f}, β={beta_theo:.2f}')
+            ax.plot(x, pdf_theoretical, 'b--', lw=2, label=f'Teoretická GIG\nλ={lambda_theo:.2f}, β={beta_theo:.2f}')
 
         ax.set_title(title)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
-        ax.set_xlim(xlim)  # Set the x-axis to range from 0 to 35
+        ax.set_xlim(xlim)  # Nastav osu X od 0 do 35
         ax.legend()
 
-# --- Data Manager Class ---
+# --- Třída Data Manager ---
 class DataManager:
     def __init__(self, config):
         self.config = config
-        self.roadcross_time_intervals = []  # Renamed for clarity
+        self.roadcross_time_intervals = []  # Přejmenováno pro jasnost
         self.spawn_time_intervals = []
         self.real_data = []
-        self.initial_speeds = []  # List for initial speeds
+        self.initial_speeds = []  # Seznam pro počáteční rychlosti
 
     def load_real_data(self, file_path):
         if self.config.SILENT:
             return
         try:
-            # Load data from Excel file
+            # Načti data z Excel souboru
             df = pd.read_excel(file_path, header=None)
             if df.shape[1] < 2:
-                # If only one column, assume it's individual intervals
+                # Pokud je pouze jeden sloupec, předpokládej, že jsou to jednotlivé intervaly
                 data = df.iloc[:, 0].values
             else:
-                # Only load unique intervals from the first column
+                # Načti pouze unikátní intervaly z prvního sloupce
                 data = df.iloc[:, 0].values
 
             if not self.config.SILENT:
-                print(f"\nLoaded {len(data)} unique intervals from '{file_path}'.")
+                print(f"\nNačteno {len(data)} unikátních intervalů ze souboru '{file_path}'.")
             self.real_data = data
         except FileNotFoundError:
             if not self.config.SILENT:
-                print(f"\nFile '{file_path}' not found.")
+                print(f"\nSoubor '{file_path}' nebyl nalezen.")
         except Exception as e:
             if not self.config.SILENT:
-                print(f"\nError loading file '{file_path}': {e}")
+                print(f"\nChyba při načítání souboru '{file_path}': {e}")
 
     def perform_ks_test(self, data, a, b, loc, title):
         """
-        Perform Kolmogorov-Smirnov test for the GIG distribution.
+        Provede Kolmogorov-Smirnov test pro GIG rozdělení.
 
-        Parameters:
-        - data (array-like): Data points
-        - a (float): Fitted parameter 'a' of GIG
-        - b (float): Fitted parameter 'b' of GIG
-        - loc (float): Fitted location parameter of GIG
-        - title (str): Description of the data
+        Parametry:
+        - data (array-like): Data
+        - a (float): Přizpůsobený parametr 'a' GIG
+        - b (float): Přizpůsobený parametr 'b' GIG
+        - loc (float): Přizpůsobený parametr loc GIG
+        - title (str): Popis dat
 
-        Returns:
-        - None (prints the results)
+        Návratové hodnoty:
+        - None (vypíše výsledky)
         """
         if self.config.SILENT:
             return
 
         if len(data) == 0:
-            print(f"\nData for '{title}' is empty. Cannot perform KS test.")
+            print(f"\nData pro '{title}' jsou prázdná. Nelze provést KS test.")
             return
 
         try:
-            # Perform KS test using the theoretical CDF with fitted parameters
+            # Proveď KS test pomocí teoretické CDF s přizpůsobenými parametry
             D, p_value = kstest(data, lambda x: geninvgauss.cdf(x, a, b, loc=loc, scale=1))
 
-            print(f"\nKolmogorov-Smirnov test for '{title}':")
-            print(f"D-statistic: {D:.4f}")
-            print(f"P-value: {p_value:.4f}")
+            print(f"\nKolmogorov-Smirnov test pro '{title}':")
+            print(f"D-statistika: {D:.4f}")
+            print(f"P-hodnota: {p_value:.4f}")
             if p_value > 0.05:
-                print("Cannot reject the null hypothesis. The distribution fits the data well.\n")
+                print("Nelze zamítnout nulovou hypotézu. Rozdělení dobře sedí na data.\n")
             else:
-                print("Reject the null hypothesis. The distribution may not fit the data well.\n")
+                print("Zamítnutí nulové hypotézy. Rozdělení nemusí dobře sedět na data.\n")
         except Exception as e:
-            print(f"Error during KS test for '{title}': {e}")
+            print(f"Chyba během KS testu pro '{title}': {e}")
 
-# --- Plotter Class ---
+# --- Třída Plotter ---
 class Plotter:
     def __init__(self, config):
         self.config = config
@@ -338,36 +338,36 @@ class Plotter:
         if self.config.SILENT:
             return
 
-        plt.figure(figsize=(18, 12))  # Increased size for more subplots
+        plt.figure(figsize=(18, 12))  # Zvýšená velikost pro více subplotů
 
-        # Subplot 2x2 grid
-        # Subplot for Spawn Time Intervals (Simulation)
+        # Subplot 2x2 mřížka
+        # Subplot pro Spawn Time Intervals (Simulace)
         plt.subplot(2, 2, 1)
         if len(data_manager.spawn_time_intervals) > 0:
             try:
                 fitted_params = gig_spawn.fit(data_manager.spawn_time_intervals)
-                if fitted_params:  # Check if fitting was successful
+                if fitted_params:  # Zkontroluj, zda přizpůsobení bylo úspěšné
                     gig_spawn.plot_fit(
                         data=data_manager.spawn_time_intervals,
                         fitted_params=fitted_params,
                         theoretical_params=(config.GIG_TIME_PARAMETERS['lambda_'], config.GIG_TIME_PARAMETERS['beta']),
-                        title='Spawn Time Intervals Histogram (Simulation)',
-                        xlabel='Time Interval (s)',
-                        ylabel='Density',
+                        title='Histogram Intervalů Spawn Časů (Simulace)',
+                        xlabel='Interval Času (s)',
+                        ylabel='Hustota',
                         ax=plt.gca(),
                         xlim=(0, 35)
                     )
-                    # Unpack fitted_params
+                    # Rozbal přizpůsobené parametry
                     a, b, loc = fitted_params
-                    data_manager.perform_ks_test(data_manager.spawn_time_intervals, a, b, loc, 'Spawn Time Intervals (Simulation)')
+                    data_manager.perform_ks_test(data_manager.spawn_time_intervals, a, b, loc, 'Spawn Time Intervals (Simulace)')
                 else:
-                    print("Spawn Time Intervals fitting was not successful.")
+                    print("Přizpůsobení Intervalů Spawn Časů nebylo úspěšné.")
             except RuntimeError as e:
                 print(str(e))
         else:
-            print("\nSimulation - Spawn Time Intervals are empty.")
+            print("\nSimulace - Intervaly Spawn Časů jsou prázdné.")
 
-        # Subplot for Roadcross Time Intervals (Simulation)
+        # Subplot pro Roadcross Time Intervals (Simulace)
         plt.subplot(2, 2, 2)
         if len(data_manager.roadcross_time_intervals) > 0:
             try:
@@ -376,24 +376,24 @@ class Plotter:
                     gig_roadcross.plot_fit(
                         data=data_manager.roadcross_time_intervals,
                         fitted_params=fitted_params,
-                        theoretical_params=None,  # No theoretical distribution provided
-                        title='Roadcross Time Intervals Histogram (Simulation)',
-                        xlabel='Time Interval (s)',
-                        ylabel='Density',
+                        theoretical_params=None,  # Žádné teoretické rozdělení poskytnuto
+                        title='Histogram Intervalů Roadcross Časů (Simulace)',
+                        xlabel='Interval Času (s)',
+                        ylabel='Hustota',
                         ax=plt.gca(),
                         xlim=(0, 35)
                     )
-                    # Unpack fitted_params
+                    # Rozbal přizpůsobené parametry
                     a, b, loc = fitted_params
-                    data_manager.perform_ks_test(data_manager.roadcross_time_intervals, a, b, loc, 'Roadcross Time Intervals (Simulation)')
+                    data_manager.perform_ks_test(data_manager.roadcross_time_intervals, a, b, loc, 'Roadcross Time Intervals (Simulace)')
                 else:
-                    print("Roadcross Time Intervals fitting was not successful.")
+                    print("Přizpůsobení Intervalů Roadcross Časů nebylo úspěšné.")
             except RuntimeError as e:
                 print(str(e))
         else:
-            print("\nSimulation - Roadcross Time Intervals are empty.")
+            print("\nSimulace - Intervaly Roadcross Časů jsou prázdné.")
 
-        # Subplot for Real Data (Real Data)
+        # Subplot pro Real Data (Reálná data)
         plt.subplot(2, 2, 3)
         if len(data_manager.real_data) > 0:
             try:
@@ -402,88 +402,88 @@ class Plotter:
                     gig_real.plot_fit(
                         data=data_manager.real_data,
                         fitted_params=fitted_params,
-                        theoretical_params=None,  # Assuming no theoretical distribution for real data
-                        title='intervals Histogram (Real Data)',
-                        xlabel='interval (s)',
-                        ylabel='Density',
+                        theoretical_params=None,  # Předpokládá se žádné teoretické rozdělení pro reálná data
+                        title='Histogram Intervalů (Reálná Data)',
+                        xlabel='Interval (s)',
+                        ylabel='Hustota',
                         ax=plt.gca(),
                         xlim=(0, 35)
                     )
-                    # Unpack fitted_params
+                    # Rozbal přizpůsobené parametry
                     a, b, loc = fitted_params
-                    data_manager.perform_ks_test(data_manager.real_data, a, b, loc, 'intervals (Real Data)')
+                    data_manager.perform_ks_test(data_manager.real_data, a, b, loc, 'intervals (Reálná Data)')
                 else:
-                    print("Real Data fitting was not successful.")
+                    print("Přizpůsobení Reálných Dat nebylo úspěšné.")
             except RuntimeError as e:
                 print(str(e))
         else:
-            print("\nReal Data is not available for fitting.")
+            print("\nReálná Data nejsou dostupná pro přizpůsobení.")
 
-        # Subplot for Initial Speeds (Simulation)
+        # Subplot pro Počáteční Rychlosti (Simulace)
         plt.subplot(2, 2, 4)
         if len(data_manager.initial_speeds) > 0:
             try:
-                # Histogram of initial speeds
+                # Histogram počátečních rychlostí
                 ax = plt.gca()
-                ax.hist(data_manager.initial_speeds, bins=30, density=True, alpha=0.6, color='c', edgecolor='black', label='Initial Speeds')
+                ax.hist(data_manager.initial_speeds, bins=30, density=True, alpha=0.6, color='c', edgecolor='black', label='Počáteční Rychlosti')
 
-                # Fitted Log-Normal PDF
+                # Přizpůsobená Log-Normal PDF
                 mu_log = config.LOGNORM_PARAMETERS["mu_log"]
                 sigma_log = config.LOGNORM_PARAMETERS["sigma_log"]
                 x = np.linspace(0, max(data_manager.initial_speeds), 1000)
                 pdf_fitted = lognorm.pdf(x, s=sigma_log, scale=np.exp(mu_log))
-                ax.plot(x, pdf_fitted, 'm-', lw=2, label='Fitted Log-Normal PDF')
+                ax.plot(x, pdf_fitted, 'm-', lw=2, label='Přizpůsobená Log-Normální PDF')
 
-                ax.set_title('Initial Speeds Histogram (Simulation)')
-                ax.set_xlabel('Speed (m/s)')
-                ax.set_ylabel('Density')
+                ax.set_title('Histogram Počátečních Rychlostí (Simulace)')
+                ax.set_xlabel('Rychlost (m/s)')
+                ax.set_ylabel('Hustota')
                 ax.set_xlim((0, 35))  # Nastaveno na 0-35
                 ax.legend()
 
-                # Perform KS test
-                # In this case, we compare the data with the theoretical log-normal distribution
+                # Proveď KS test
+                # V tomto případě porovnáme data s teoretickým log-normálním rozdělením
                 D, p_value = kstest(data_manager.initial_speeds, lambda x: lognorm.cdf(x, s=sigma_log, scale=np.exp(mu_log)))
-                print(f"\nKolmogorov-Smirnov test for 'Initial Speeds (Simulation)':")
-                print(f"D-statistic: {D:.4f}")
-                print(f"P-value: {p_value:.4f}")
+                print(f"\nKolmogorov-Smirnov test pro 'Počáteční Rychlosti (Simulace)':")
+                print(f"D-statistika: {D:.4f}")
+                print(f"P-hodnota: {p_value:.4f}")
                 if p_value > 0.05:
-                    print("Cannot reject the null hypothesis. The distribution fits the data well.\n")
+                    print("Nelze zamítnout nulovou hypotézu. Rozdělení dobře sedí na data.\n")
                 else:
-                    print("Reject the null hypothesis. The distribution may not fit the data well.\n")
+                    print("Zamítnutí nulové hypotézy. Rozdělení nemusí dobře sedět na data.\n")
 
             except Exception as e:
-                print(f"Error during plotting initial speeds: {e}")
+                print(f"Chyba při vykreslování počátečních rychlostí: {e}")
         else:
-            print("\nSimulation - Initial Speeds are empty.")
+            print("\nSimulace - Počáteční Rychlosti jsou prázdné.")
 
         plt.tight_layout()
         plt.show()
 
-# --- Road Class ---
+# --- Třída Road ---
 class Road:
     def __init__(self, road_type, config):
         self.road_type = road_type
         self.config = config
-        self.cars = deque()  # Using deque for efficient removals
+        self.cars = deque()  # Použití deque pro efektivní odstraňování
         self.gig_distribution = GIGDistribution(lambda_=config.GIG_TIME_PARAMETERS['lambda_'],
                                                 beta=config.GIG_TIME_PARAMETERS['beta'])
         try:
             self.next_spawn_time_interval = self.gig_distribution.sample(num_samples=1)[0]
         except ValueError as e:
             if not self.config.SILENT:
-                print(f"Error sampling initial spawn time interval: {e}")
-            self.next_spawn_time_interval = 10.0  # Default time interval
+                print(f"Chyba při vzorkování počátečního intervalu spawn času: {e}")
+            self.next_spawn_time_interval = 10.0  # Výchozí časový interval
         self.time_since_last_spawn = 0.0
         self.cars_spawned = 0
-        self.cross_times = deque(maxlen=2)  # Stores the last two cross times
+        self.cross_times = deque(maxlen=2)  # Ukládá poslední dva časy průjezdu křižovatkou
 
     def spawn_car(self, data_manager):
         if self.cars_spawned >= self.config.MAX_CARS:
             if not self.config.SILENT:
-                print("Maximum number of cars spawned. No more cars will be spawned.")
+                print("Maximální počet aut bylo spawnováno. Další auta nebudou spawnována.")
             return
 
-        # Sample initial speed from log-normal distribution
+        # Vzorkuj počáteční rychlost z log-normálního rozdělení
         initial_speed = lognorm.rvs(s=self.config.LOGNORM_PARAMETERS["sigma_log"], scale=np.exp(self.config.LOGNORM_PARAMETERS["mu_log"]))
         initial_speed = max(initial_speed, 0.0)
 
@@ -492,9 +492,9 @@ class Road:
         data_manager.initial_speeds.append(initial_speed)
 
         if not self.config.SILENT:
-            print(f"Spawned car {self.cars_spawned + 1}/{self.config.MAX_CARS} with speed {initial_speed * 3.6:.2f} km/h and spawn interval {spawn_time_interval:.2f} seconds.")
+            print(f"Spawnováno auto {self.cars_spawned + 1}/{self.config.MAX_CARS} s rychlostí {initial_speed * 3.6:.2f} km/h a spawn intervalem {spawn_time_interval:.2f} sekund.")
 
-        # Create and add the new car at the start of the road
+        # Vytvoř a přidej nové auto na začátek silnice
         new_car = Car(position=0.0, road=self, config=self.config, initial_speed=initial_speed)
         self.cars.append(new_car)
         self.cars_spawned += 1
@@ -504,28 +504,28 @@ class Road:
             self.next_spawn_time_interval = self.gig_distribution.sample(num_samples=1)[0]
         except ValueError as e:
             if not self.config.SILENT:
-                print(f"Error sampling next spawn time interval: {e}. Setting default interval of 5.0 seconds.")
+                print(f"Chyba při vzorkování dalšího intervalu spawn času: {e}. Nastavuji výchozí interval 5.0 sekund.")
             self.next_spawn_time_interval = 5.0  # Nastaveno na 5 sekund pro rychlejší spawnování
 
     def update_cars(self, dt_sim, data_manager, current_time):
         if not self.cars:
             if not self.config.SILENT:
-                print("No cars on the road.")
-            # Even if no cars on the road, continue simulation to spawn more cars
+                print("Na silnici nejsou žádná auta.")
+            # I když na silnici nejsou žádná auta, pokračuj v simulaci a spawnuj další auta
             self.time_since_last_spawn += dt_sim
             if self.cars_spawned < self.config.MAX_CARS and self.time_since_last_spawn >= self.next_spawn_time_interval:
                 self.spawn_car(data_manager)
-            return False, None  # No collision or end condition
+            return False, None  # Žádná kolize nebo konec podmínky
 
-        # Sort cars from front to back
+        # Seřaď auta od čela k zadní části
         self.cars = deque(sorted(self.cars, key=lambda car: car.position, reverse=True))
 
-        # Update car positions
+        # Aktualizuj pozice aut
         for i, car in enumerate(self.cars):
             lead_car = self.cars[i - 1] if i > 0 else None
             car.update(dt_sim, lead_car)
 
-            # Record crossing Roadcross
+            # Zaznamenej průjezd křižovatkou
             if not car.roadcross_recorded and car.position >= self.config.ROADCROSS_POSITION:
                 car.roadcross_recorded = True
                 self.cross_times.append(current_time)
@@ -534,39 +534,39 @@ class Road:
                     time_interval = self.cross_times[1] - self.cross_times[0]
                     data_manager.roadcross_time_intervals.append(time_interval)
 
-        # Remove cars that have left the screen
+        # Odstraň auta, která opustila obrazovku
         while self.cars and self.cars[0].has_left_screen:
             removed_car = self.cars.popleft()
 
-        # Increment time since last spawn
+        # Inkrementuj čas od posledního spawnování
         self.time_since_last_spawn += dt_sim
-        # Check if it's time to spawn a new car
+        # Zkontroluj, zda je čas spawnovat nové auto
         if self.cars_spawned < self.config.MAX_CARS:
             if self.time_since_last_spawn >= self.next_spawn_time_interval:
                 self.spawn_car(data_manager)
 
-        # Check if all cars have passed Roadcross
+        # Zkontroluj, zda všechna auta prošla křižovatkou
         all_passed = all(car.position > self.config.ROADCROSS_POSITION for car in self.cars)
         if all_passed and self.cars_spawned >= self.config.MAX_CARS:
             if not self.config.SILENT:
-                print("All cars have passed Roadcross.")
-            return True, "natural_end"  # End of simulation without collision
+                print("Všechna auta prošla křižovatkou.")
+            return True, "natural_end"  # Konec simulace bez kolize
 
-        return False, None  # No collision and simulation continues
+        return False, None  # Žádná kolize a simulace pokračuje
 
     def draw(self, window, font):
-        # Draw the main road
+        # Nakresli hlavní silnici
         y = self.config.HEIGHT // 2
         pygame.draw.line(window, self.config.COLORS['BLACK'], (0, y), (self.config.WIDTH, y), 5)
 
-        # Draw road markings every 50 meters
+        # Nakresli silniční značky každých 50 metrů
         for pos in range(0, int(self.config.ROAD_LENGTH) + 1, 50):
             x = int(pos * self.config.SCALE)
             pygame.draw.line(window, self.config.COLORS['GRAY'], (x, y - 20), (x, y + 20), 2)
             label = font.render(f"{pos} m", True, self.config.COLORS['BLACK'])
             window.blit(label, (x, y - 35))
 
-        # Draw Roadcross
+        # Nakresli Roadcross
         roadcross_x = int(self.config.ROADCROSS_X_PX)
         roadcross_y = y
         pygame.draw.circle(window, self.config.COLORS['RED'], (roadcross_x, roadcross_y), 5)
@@ -574,12 +574,12 @@ class Road:
         roadcross_label = roadcross_font.render("Roadcross", True, self.config.COLORS['RED'])
         window.blit(roadcross_label, (roadcross_x - 60, roadcross_y - 20))
 
-        # Draw all cars (only if visualization is enabled)
+        # Nakresli všechna auta (pouze pokud je vizualizace povolena)
         if not self.config.VISUALIZE:
             for car in self.cars:
                 car.draw(window, font)
 
-# --- Simulation class ---
+# --- Třída Simulation ---
 class Simulation:
     def __init__(self, silent=False, config=None):
         pygame.init()
@@ -589,7 +589,7 @@ class Simulation:
             self.config = Config()
         else:
             self.config = config
-        self.config.SILENT = silent  # Nastavení silent režimu podle parametru
+        self.config.SILENT = silent  # Nastavení režimu silent podle parametru
         self.config.VISUALIZE = silent
 
         self.data_manager = DataManager(config=self.config)
@@ -600,23 +600,23 @@ class Simulation:
         self.road = Road(road_type='main', config=self.config)
 
         self.window = pygame.display.set_mode((self.config.WIDTH, self.config.HEIGHT))
-        pygame.display.set_caption("Traffic Simulation")
+        pygame.display.set_caption("Simulace Dopravy")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont(None, 20)
         self.speed_multiplier = 1
         self.running = True
         self.collision_occurred = False
         self.collision_timer = 0
-        self.collision_duration = 3  # seconds
-        self.current_simulation_time = 0.0  # Initialize simulation time
+        self.collision_duration = 3  # sekundy
+        self.current_simulation_time = 0.0  # Inicializuj simulační čas
 
-        # Button settings (only relevant if VISUALIZE=True)
+        # Nastavení tlačítka (relevantní pouze pokud VIZUALIZE=True)
         self.button_rect = pygame.Rect(10, 10, 150, 50)
         self.button_color = self.config.COLORS['GRAY']
-        self.button_text = "Speed: 1x"
+        self.button_text = "Rychlost: 1x"
 
-        # Debug: Print initialized parameters
-        print(f"Simulation initialized with parameters: max_acc={self.config.MAX_ACCELERATION}, "
+        # Debug: Vytiskni inicializované parametry
+        print(f"Simulace inicializována s parametry: max_acc={self.config.MAX_ACCELERATION}, "
               f"max_dec={self.config.MAX_DECELERATION}, react_time={self.config.REACT_TIME}, "
               f"min_gap={self.config.MIN_GAP}, delta={self.config.DELTA}, "
               f"desired_speed={self.config.DESIRED_SPEED}")
@@ -625,18 +625,18 @@ class Simulation:
         try:
             self.road.spawn_car(self.data_manager)
 
-            # Fixed simulation step for consistency
-            dt = 0.016  # Set to 16 ms (60 FPS) for stable realistic step
+            # Pevný simulační krok pro konzistenci
+            dt = 0.016  # Nastaveno na 16 ms (60 FPS) pro stabilní realistický krok
 
             while self.running:
                 if not self.config.VISUALIZE:
-                    # Set framerate to respect `speed_multiplier` in visualization
+                    # Nastav snímkovou frekvenci podle `speed_multiplier` ve vizualizaci
                     self.clock.tick(60 * self.speed_multiplier)
                 else:
-                    # If `VISUALIZE=False`, allow maximum framerate
+                    # Pokud `VIZUALIZE=False`, povol maximální snímkovou frekvenci
                     self.clock.tick()
 
-                # Process events (speed change in visualization)
+                # Zpracuj události (změna rychlosti ve vizualizaci)
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         self.running = False
@@ -644,28 +644,28 @@ class Simulation:
                         if self.button_rect.collidepoint(event.pos):
                             self.change_speed()
 
-                # Increment simulation time
+                # Inkrementuj simulační čas
                 dt_sim = dt * self.speed_multiplier
                 self.current_simulation_time += dt_sim
 
-                # Update cars based on simulation delta time `dt_sim`
+                # Aktualizuj auta na základě simulačního delta času `dt_sim`
                 if not self.collision_occurred:
                     ended, reason = self.road.update_cars(dt_sim, self.data_manager, self.current_simulation_time)
                     if ended:
                         if reason == "collision":
                             self.collision_occurred = True
                             if not self.config.SILENT:
-                                print("Collision occurred! Simulation will end shortly.")
+                                print("Kolidování nastalo! Simulace se brzy ukončí.")
                         elif reason == "natural_end":
                             if not self.config.SILENT:
-                                print("Simulation completed without any collisions.")
+                                print("Simulace dokončena bez kolizí.")
                             self.running = False
                 else:
                     self.collision_timer += dt_sim
                     if self.collision_timer >= self.collision_duration:
                         self.running = False
 
-                # Draw window if visualization is enabled
+                # Nakresli okno, pokud je vizualizace povolena
                 if not self.config.VISUALIZE:
                     self.window.fill(self.config.COLORS['WHITE'])
                     self.road.draw(self.window, self.font)
@@ -673,14 +673,14 @@ class Simulation:
 
                     if self.collision_occurred:
                         crash_font = pygame.font.SysFont(None, 50)
-                        crash_text = crash_font.render("CRASH!", True, self.config.COLORS['RED'])
+                        crash_text = crash_font.render("NÁRAZ!", True, self.config.COLORS['RED'])
                         crash_rect = crash_text.get_rect(center=(self.config.WIDTH // 2, self.config.HEIGHT // 2 - 40))
                         self.window.blit(crash_text, crash_rect)
 
                     pygame.display.flip()
             pygame.quit()
 
-            # After simulation ends, process and plot results if not in silent mode
+            # Po ukončení simulace, zpracuj a vykresli výsledky, pokud není v silent režimu
             if not self.collision_occurred and not self.config.SILENT:
                 self.data_manager.load_real_data("real_data.xlsx")
                 self.plotter.plot_histograms(
@@ -694,7 +694,7 @@ class Simulation:
 
         except Exception as e:
             if not self.config.SILENT:
-                print(f"An error occurred during the simulation: {e}")
+                print(f"Došlo k chybě během simulace: {e}")
             pygame.quit()
             sys.exit(1)
 
@@ -703,9 +703,9 @@ class Simulation:
             self.speed_multiplier *= 2
         else:
             self.speed_multiplier = 1
-        self.button_text = f"Speed: {self.speed_multiplier}x"
+        self.button_text = f"Rychlost: {self.speed_multiplier}x"
         if not self.config.SILENT:
-            print(f"Speed multiplier changed to {self.speed_multiplier}x")
+            print(f"Rychlostní násobitel změněn na {self.speed_multiplier}x")
 
     def draw_button(self):
         pygame.draw.rect(self.window, self.button_color, self.button_rect)
@@ -717,53 +717,53 @@ class Simulation:
         if self.config.SILENT:
             return
 
-        print("\n--- GIG Distribution Fitting Results ---")
-        print("\nTheoretical Parameters (GIG_TIME_PARAMETERS):")
+        print("\n--- Výsledky Přizpůsobení GIG Rozdělení ---")
+        print("\nTeoretické Parametry (GIG_TIME_PARAMETERS):")
         print(f"Lambda (λ): {self.config.GIG_TIME_PARAMETERS['lambda_']:.4f}")
         print(f"Beta (β): {self.config.GIG_TIME_PARAMETERS['beta']:.4f}")
 
-        # Fitted Parameters for Spawn Time Intervals
+        # Přizpůsobené Parametry pro Intervaly Spawn Časů
         if hasattr(self.gig_spawn, 'fitted_params') and self.gig_spawn.fitted_params is not None:
             a, b, loc = self.gig_spawn.fitted_params
-            print("\nSimulation - Spawn Time Intervals (Fitted):")
+            print("\nSimulace - Intervaly Spawn Časů (Přizpůsobené):")
             print(f"Lambda (λ): {a:.4f}")
             print(f"b: {b:.4f}")
             print(f"Loc: {loc:.4f}")
         else:
-            print("\nSimulation - Spawn Time Intervals fitting was not successful.")
+            print("\nSimulace - Přizpůsobení Intervalů Spawn Časů nebylo úspěšné.")
 
-        # Fitted Parameters for Roadcross Time Intervals
+        # Přizpůsobené Parametry pro Intervaly Roadcross Časů
         if hasattr(self.gig_roadcross, 'fitted_params') and self.gig_roadcross.fitted_params is not None:
             a, b, loc = self.gig_roadcross.fitted_params
-            print("\nSimulation - Roadcross Time Intervals (Fitted):")
+            print("\nSimulace - Intervaly Roadcross Časů (Přizpůsobené):")
             print(f"Lambda (λ): {a:.4f}")
             print(f"b: {b:.4f}")
             print(f"Loc: {loc:.4f}")
         else:
-            print("\nSimulation - Roadcross Time Intervals fitting was not successful.")
+            print("\nSimulace - Přizpůsobení Intervalů Roadcross Časů nebylo úspěšné.")
 
-        # Fitted Parameters for Real Data
+        # Přizpůsobené Parametry pro Reálná Data
         if hasattr(self.gig_real, 'fitted_params') and len(
                 self.data_manager.real_data) > 0 and self.gig_real.fitted_params is not None:
             a, b, loc = self.gig_real.fitted_params
-            print("\nReal Data - intervals (Fitted):")
+            print("\nReálná Data - Intervaly (Přizpůsobené):")
             print(f"Lambda (λ): {a:.4f}")
             print(f"b: {b:.4f}")
             print(f"Loc: {loc:.4f}")
         else:
-            print("\nReal Data fitting was not successful or data is unavailable.")
+            print("\nPřizpůsobení Reálných Dat nebylo úspěšné nebo data nejsou dostupná.")
 
-# --- Main Execution ---
+# --- Hlavní Spuštění ---
 if __name__ == "__main__":
-    # Example usage:
-    # To run simulation normally:
+    # Příklad použití:
+    # Pro spuštění simulace normálně:
     # simulation = Simulation(silent=False)
     # simulation.run()
 
-    # To run simulation silently:
+    # Pro spuštění simulace v tichém režimu:
     # simulation = Simulation(silent=True)
     # simulation.run()
 
-    # For optimization purposes, you would run it silently to collect roadcross_time_intervals
+    # Pro účely optimalizace byste ji spustili v tichém režimu pro sběr roadcross_time_intervals
     simulation = Simulation(silent=False)
     simulation.run()
