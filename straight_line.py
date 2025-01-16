@@ -26,13 +26,20 @@ class Config:
     }
 
     # IDM parameters
-    #test - 2,75	3	4	2	25	4
-    MIN_GAP = 2.75  # Minimum gap between cars
-    MAX_ACCELERATION = 3.0  # Maximum acceleration in m/s²
+    '''
+    'min_gap': 1.625,
+    'acceleration': 2.0,
+    'comfortable_deceleration': 4.0,
+    'react_time': 0.3,
+    'desired_speed': 19.44,  # ~50 km/h
+    'delta': 2,
+    '''
+    MIN_GAP = 1.625  # Minimum gap between cars
+    MAX_ACCELERATION = 2.0  # Maximum acceleration in m/s²
     MAX_DECELERATION = 4.0  # Maximum deceleration in m/s²
-    REACT_TIME = 2.0  # Driver's react time (time headway)
-    DESIRED_SPEED = 25.0
-    DELTA = 4
+    REACT_TIME = 0.3  # Driver's react time (time headway)
+    DESIRED_SPEED = 19.44
+    DELTA = 2
 
     # Road Settings
     ROAD_LENGTH = 300  # Road length in meters
@@ -87,12 +94,12 @@ class Car:
         self.a = 0.0              # Acceleration (m/s²)
         self.idm = IDM(config)
         self.color = config.COLORS['BLUE']
-        self.has_recorded_distance = False  # Flag to check if distance has been recorded
+        self.has_recorded_interval = False  # Flag to check if interval has been recorded
 
         # Additional attributes
         self.should_remove = False          # Indicates if the car should be removed
         self.has_left_screen = False        # Indicates if the car has left the screen
-        self.roadcross_recorded = False     # Indicates if roadcross distance has been recorded
+        self.roadcross_recorded = False     # Indicates if roadcross interval has been recorded
 
     def update(self, dt, lead_car=None):
         if lead_car:
@@ -271,14 +278,14 @@ class DataManager:
             # Load data from Excel file
             df = pd.read_excel(file_path, header=None)
             if df.shape[1] < 2:
-                # If only one column, assume it's individual distances
+                # If only one column, assume it's individual intervals
                 data = df.iloc[:, 0].values
             else:
-                # Only load unique distances from the first column
+                # Only load unique intervals from the first column
                 data = df.iloc[:, 0].values
 
             if not self.config.SILENT:
-                print(f"\nLoaded {len(data)} unique distances from '{file_path}'.")
+                print(f"\nLoaded {len(data)} unique intervals from '{file_path}'.")
             self.real_data = data
         except FileNotFoundError:
             if not self.config.SILENT:
@@ -396,15 +403,15 @@ class Plotter:
                         data=data_manager.real_data,
                         fitted_params=fitted_params,
                         theoretical_params=None,  # Assuming no theoretical distribution for real data
-                        title='Distances Histogram (Real Data)',
-                        xlabel='Distance (m)',
+                        title='intervals Histogram (Real Data)',
+                        xlabel='interval (s)',
                         ylabel='Density',
                         ax=plt.gca(),
                         xlim=(0, 35)
                     )
                     # Unpack fitted_params
                     a, b, loc = fitted_params
-                    data_manager.perform_ks_test(data_manager.real_data, a, b, loc, 'Distances (Real Data)')
+                    data_manager.perform_ks_test(data_manager.real_data, a, b, loc, 'intervals (Real Data)')
                 else:
                     print("Real Data fitting was not successful.")
             except RuntimeError as e:
@@ -675,7 +682,7 @@ class Simulation:
 
             # After simulation ends, process and plot results if not in silent mode
             if not self.collision_occurred and not self.config.SILENT:
-                self.data_manager.load_real_data("data/real_data.xlsx")
+                self.data_manager.load_real_data("real_data.xlsx")
                 self.plotter.plot_histograms(
                     data_manager=self.data_manager,
                     gig_spawn=self.gig_spawn,
@@ -739,7 +746,7 @@ class Simulation:
         if hasattr(self.gig_real, 'fitted_params') and len(
                 self.data_manager.real_data) > 0 and self.gig_real.fitted_params is not None:
             a, b, loc = self.gig_real.fitted_params
-            print("\nReal Data - Distances (Fitted):")
+            print("\nReal Data - intervals (Fitted):")
             print(f"Lambda (λ): {a:.4f}")
             print(f"b: {b:.4f}")
             print(f"Loc: {loc:.4f}")
