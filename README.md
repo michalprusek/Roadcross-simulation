@@ -107,6 +107,10 @@ Tento proces probíhá na základě bezpečné mezery mezi vozidly na hlavní si
 
 ## Porovnání reálných dat z T křižovatky a simulace
 
+Naměřená data časových intervalů mezi průjezdy aut na hlavní a počet aut, které se do mezery zařadilo z vedlejší jsou pak analyzována a porovnána s reálnými daty v kódu merging_data_analysis.py. Data z obou souborů jsou rozdělena do kategorií podle počtu zařazených aut. Dvě sobě příslušející kategorie z obou souborů jsou porovnány. Testuje se podobnost rozdělení dvou výběrů (časových intervalů průjezdů aut na hlavní silnici) v rámci dané kategorie pomocí Kolmogorov-Smirnov GoF testu. Tímto způsobem se vyhodnotí všechny kategorie. Ve všech kategoriích byla nulová hypotéza zamítnuta. Pomocí KS GoF testu byly vyhodnoceny také celé výběry intervalů průjezdů z reálných dat a simulace, tento test byl ale také zamítnut, přestože na základě vizuálního porovnání jsou si histogramy poměrně blízké.
+
+
+
 
 
 
