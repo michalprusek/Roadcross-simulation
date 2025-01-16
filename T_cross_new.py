@@ -23,7 +23,7 @@ class Config:
     Centrální konfigurace simulace.
     """
     # --- Vizualizace ---
-    VISUALIZE = False  # Pokud nastavíte na True, otevře se okno a simulace poběží reálně; False = maximální rychlost
+    VISUALIZE = False  # Pokud nastavíte na True, otevře se okno a simulace poběží reálně; False - simulace jede rychleji, ale nezobrazuje se
 
     WIDTH, HEIGHT = 900, 600
     SCALE_MAIN = 1
@@ -103,7 +103,7 @@ class Config:
 
 class IDM:
     """
-    Intelligent Driver Model pro výpočet zrychlení/decelerace.
+    Intelligent Driver Model
     """
     def __init__(self, config, road_type='main'):
         if road_type == 'main':
